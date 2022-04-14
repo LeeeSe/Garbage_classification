@@ -8,9 +8,13 @@ from torchvision import models
 from PIL import Image
 
 # 定义transform
-transform = transforms.Compose([
-    transforms.Resize(256),
-    transforms.CenterCrop(224),
+train_transform = transforms.Compose([
+    transforms.Resize((256, 256)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+])
+test_transform = transforms.Compose([
+    transforms.Resize((256, 256)),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
@@ -42,6 +46,9 @@ class Garbage_Dataset(torch.utils.data.Dataset):
                     line = line.strip().split(',')
                     self.data.append(os.path.join(self.root, line[0]))
                     self.label.append(int(line[1]))
+        # # 只取数据集的百分之一作为调试
+        # self.data = self.data[:int(len(self.data) * 0.01)]
+        # self.label = self.label[:int(len(self.label) * 0.01)]
         # 将data与label同步打乱
         data_label = list(zip(self.data, self.label))
         shuffle(data_label)
@@ -67,8 +74,8 @@ class Garbage_Dataset(torch.utils.data.Dataset):
 
 
 # 定义数据集并split为训练集和测试集
-train_dataset = Garbage_Dataset(root='datasets/garbage_classify/train_data', transform=transform, train=True)
-test_dataset = Garbage_Dataset(root='datasets/garbage_classify/train_data', train=False)
+train_dataset = Garbage_Dataset(root='datasets/garbage_classify/train_data', transform=train_transform, train=True)
+test_dataset = Garbage_Dataset(root='datasets/garbage_classify/train_data', transform=test_transform, train=False)
 
 # 定义训练集和测试集的加载器
 train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=8, shuffle=True)
@@ -90,7 +97,7 @@ model = models.efficientnet_b0(pretrained=True)
 num_ftrs = model.classifier[1].in_features
 model.classifier[1] = torch.nn.Linear(num_ftrs, 40)
 model.to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001)  # 定义优化器
+optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)  # 定义优化器
 criterion = torch.nn.CrossEntropyLoss()  # 定义损失函数
 
 
@@ -134,4 +141,6 @@ def test(model, device, test_loader, criterion):
 for epoch in range(1, 10):
     train(model, device, train_loader, optimizer, criterion, epoch)
     test(model, device, test_loader, criterion)
+    # 保存模型
+    torch.save(model.state_dict(), 'models/garbage_classify.pth')
 
